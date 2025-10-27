@@ -163,9 +163,33 @@ function tts(text, useVoiceName=null){
     synth.speak(u);
   }catch(e){ console.warn('tts fail', e); }
 }
+
+/* Global AudioContext for iOS compatibility */
+let audioCtx = null;
+function initAudioContext(){
+  if(!audioCtx){
+    try{
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Resume context if suspended (iOS requirement)
+      if(audioCtx.state === 'suspended'){
+        audioCtx.resume();
+      }
+    }catch(e){ console.warn('AudioContext init fail', e); }
+  }
+  return audioCtx;
+}
+
 function beep(freq=900, dur=0.06){
   try{
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Initialize or reuse AudioContext (iOS-friendly)
+    const ctx = initAudioContext();
+    if(!ctx) return;
+    
+    // Resume if suspended (iOS requirement)
+    if(ctx.state === 'suspended'){
+      ctx.resume().catch(e => console.warn('AudioContext resume fail', e));
+    }
+    
     const o = ctx.createOscillator(); const g = ctx.createGain();
     o.type='sine'; o.frequency.value = freq;
     o.connect(g); g.connect(ctx.destination);
@@ -430,6 +454,10 @@ function startWarmupBeforeSet(){
   const uiCount = document.getElementById('ui_count');
   const uiStatus = document.getElementById('ui_status');
   uiStatus.textContent = `Warm-up ${t}s`;
+  
+  // Initialize AudioContext on user action (iOS requirement)
+  initAudioContext();
+  
   tts('Get ready');
   vibrate(60);
   if(runCtx.timerId){ clearTimeout(runCtx.timerId); runCtx.timerId = null; }
@@ -681,7 +709,9 @@ function renderSettingsPanel(){
   setFeedbackInner.appendChild(saveBtn);
   
   const testBtn = document.createElement('button'); testBtn.className='btn small'; testBtn.textContent='Test Voice'; testBtn.style.marginLeft='8px';
+  const testBeepBtn = document.createElement('button'); testBeepBtn.className='btn small'; testBeepBtn.textContent='Test Beep'; testBeepBtn.style.marginLeft='8px';
   settingsInner.appendChild(testBtn);
+  settingsInner.appendChild(testBeepBtn);
   
   const hr = document.createElement('hr'); hr.style.marginTop='12px'; settingsInner.appendChild(hr);
   const exp = document.createElement('button'); exp.className='btn small'; exp.textContent='Export JSON';
@@ -707,6 +737,13 @@ function renderSettingsPanel(){
       if(v) u.voice = v;
     }
     synth.speak(u);
+  };
+  
+  // Test beep - initializes AudioContext for iOS
+  testBeepBtn.onclick = ()=> {
+    initAudioContext(); // Initialize on user gesture (iOS requirement)
+    beep(900, 0.15); // Standard countdown beep
+    setTimeout(()=> beep(1200, 0.2), 300); // Set complete beep
   };
   saveBtn.onclick = ()=> {
     state.settings.rate = parseFloat(rate.value) || 1;

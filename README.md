@@ -52,11 +52,23 @@ Simply open `index.html` in a web browser. For full PWA features, you'll need to
 ## Settings
 
 - **Voice Settings**: Choose TTS voice and speech rate
+- **Test Voice**: Test the selected voice before saving
+- **Test Beep**: Test beep sounds (important for iOS - see below)
 - **Set Completion Feedback**: 
   - TTS: Says "set complete"
   - Beep: Plays a distinct beep sound
   - None: No audio feedback
 - **Export/Import**: Backup and restore your data
+
+### iOS Beep Support
+
+On iOS devices, beep sounds require user interaction to initialize. To enable beeps on iOS:
+
+1. Go to Settings tab
+2. Click "Test Beep" button (this unlocks audio for iOS)
+3. Now beeps will work during your exercises
+
+Alternatively, beeps will automatically initialize when you start your first exercise.
 
 ## GitHub Pages Deployment
 
