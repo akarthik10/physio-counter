@@ -53,12 +53,23 @@ Simply open `index.html` in a web browser. For full PWA features, you'll need to
 
 - **Voice Settings**: Choose TTS voice and speech rate
 - **Test Voice**: Test the selected voice before saving
-- **Test Beep**: Test beep sounds (important for iOS - see below)
+- **Test Beep**: Test all beep sounds (important for iOS - see below)
+- **Warmup Countdown Feedback**:
+  - TTS: Voice countdown ("Get ready", "5", "4", "3", "2", "1", "Go")
+  - Beep: Beep countdown with lower tone (700Hz) and distinct "Go" beep (1400Hz)
 - **Set Completion Feedback**: 
   - TTS: Says "set complete"
-  - Beep: Plays a distinct beep sound
+  - Beep: Plays a distinct beep sound (1200Hz)
   - None: No audio feedback
 - **Export/Import**: Backup and restore your data
+
+### Beep Tone Reference
+
+The app uses different beep tones for different events:
+- **Warmup countdown**: 700Hz (lower, mellower tone)
+- **Warmup "Go"**: 1400Hz (high, energetic tone)
+- **Exercise countdown**: 900Hz (standard tone)
+- **Set complete**: 1200Hz (higher, completion tone)
 
 ### iOS Beep Support
 

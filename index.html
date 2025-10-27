@@ -139,7 +139,7 @@ button, .item, .tab { cursor: pointer; }
 
 /* Persistence key */
 const KEY = 'physio_v4_6';
-let state = JSON.parse(localStorage.getItem(KEY) || '{"exercises":[],"history":[],"settings":{"voice":null,"rate":1,"setFeedback":"tts"}}');
+let state = JSON.parse(localStorage.getItem(KEY) || '{"exercises":[],"history":[],"settings":{"voice":null,"rate":1,"setFeedback":"tts","warmupFeedback":"tts"}}');
 
 /* utility */
 function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
@@ -228,7 +228,7 @@ function normalizeState(){
     return ex;
   });
   state.history = state.history || [];
-  state.settings = state.settings || {voice:null, rate:1, setFeedback:'tts'};
+  state.settings = state.settings || {voice:null, rate:1, setFeedback:'tts', warmupFeedback:'tts'};
   save();
 }
 normalizeState();
@@ -458,8 +458,15 @@ function startWarmupBeforeSet(){
   // Initialize AudioContext on user action (iOS requirement)
   initAudioContext();
   
-  tts('Get ready');
+  // Warmup feedback based on setting
+  const warmupMode = state.settings?.warmupFeedback || 'tts';
+  if(warmupMode === 'tts'){
+    tts('Get ready');
+  } else {
+    beep(700, 0.1); // Warmup start beep (lower tone)
+  }
   vibrate(60);
+  
   if(runCtx.timerId){ clearTimeout(runCtx.timerId); runCtx.timerId = null; }
   function tick(){
     if(!runCtx) return;
@@ -467,11 +474,21 @@ function startWarmupBeforeSet(){
     t--;
     if(t > 0){
       uiCount.textContent = String(t);
-      tts(String(t));
+      // Countdown feedback based on setting
+      if(warmupMode === 'tts'){
+        tts(String(t));
+      } else {
+        beep(700, 0.1); // Warmup countdown beep
+      }
       runCtx.timerId = setTimeout(tick, 1000);
     } else {
       uiCount.textContent = 'Go';
-      tts('Go');
+      // "Go" feedback based on setting
+      if(warmupMode === 'tts'){
+        tts('Go');
+      } else {
+        beep(1400, 0.2); // Warmup "Go" beep (higher tone)
+      }
       vibrate(120);
       runCtx.timerId = null;
       startCounting();
@@ -678,6 +695,8 @@ function renderSettingsPanel(){
     <h3>Settings</h3>
     <div class="small-muted">Global voice settings (used for TTS)</div>
     <div id="settingsInner" style="margin-top:8px"></div>
+    <div class="small-muted" style="margin-top:16px">Warmup countdown feedback</div>
+    <div id="warmupFeedbackInner" style="margin-top:8px"></div>
     <div class="small-muted" style="margin-top:16px">Set completion feedback</div>
     <div id="setFeedbackInner" style="margin-top:8px"></div>
   `;
@@ -693,6 +712,15 @@ function renderSettingsPanel(){
   settingsInner.appendChild(sel);
   const rate = document.createElement('input'); rate.type='range'; rate.min=0.5; rate.max=2; rate.step=0.05; rate.value = state.settings?.rate || 1; rate.style.marginTop='8px';
   settingsInner.appendChild(rate);
+  
+  // Warmup feedback settings
+  const warmupFeedbackInner = document.getElementById('warmupFeedbackInner');
+  const warmupFeedbackSel = document.createElement('select'); warmupFeedbackSel.className = 'input'; warmupFeedbackSel.id = 'warmupFeedbackSel';
+  warmupFeedbackSel.innerHTML = `
+    <option value="tts" ${state.settings?.warmupFeedback === 'tts' ? 'selected' : ''}>TTS - Voice countdown</option>
+    <option value="beep" ${state.settings?.warmupFeedback === 'beep' ? 'selected' : ''}>Beep - Beep countdown</option>
+  `;
+  warmupFeedbackInner.appendChild(warmupFeedbackSel);
   
   // Set feedback settings
   const setFeedbackInner = document.getElementById('setFeedbackInner');
@@ -742,12 +770,15 @@ function renderSettingsPanel(){
   // Test beep - initializes AudioContext for iOS
   testBeepBtn.onclick = ()=> {
     initAudioContext(); // Initialize on user gesture (iOS requirement)
-    beep(900, 0.15); // Standard countdown beep
-    setTimeout(()=> beep(1200, 0.2), 300); // Set complete beep
+    beep(700, 0.1); // Warmup countdown beep
+    setTimeout(()=> beep(1400, 0.2), 250); // Warmup "Go" beep
+    setTimeout(()=> beep(900, 0.06), 500); // Exercise countdown beep
+    setTimeout(()=> beep(1200, 0.15), 700); // Set complete beep
   };
   saveBtn.onclick = ()=> {
     state.settings.rate = parseFloat(rate.value) || 1;
     state.settings.voice = sel.value || null;
+    state.settings.warmupFeedback = warmupFeedbackSel.value || 'tts';
     state.settings.setFeedback = setFeedbackSel.value || 'tts';
     save();
     alert('Saved');
