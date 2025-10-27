@@ -1,0 +1,796 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="description" content="Offline physiotherapy exercise counter with customizable sets, reps, and intervals">
+<meta name="theme-color" content="#1976d2"/>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Physio Counter">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<title>Physio Counter v4.6.1</title>
+
+<style>
+:root{
+  --accent:#1976d2;
+  --bg:#f6fbff;
+  --card:#ffffff;
+  --muted:#52667a;
+  --radius:12px;
+  --shadow: 0 6px 18px rgba(17,24,39,0.06);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#072034}
+.app-header{background:linear-gradient(90deg,var(--accent),#1565c0);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.app-title{font-weight:700}
+.container{max-width:980px;margin:18px auto;padding:12px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{
+  background:#fff;color:var(--accent);
+  border:1px solid rgba(25,118,210,0.06);
+  padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600;
+}
+.tab:hover{box-shadow:var(--shadow)}
+.tab.active{
+  background:var(--accent);color:#fff;box-shadow:0 8px 24px rgba(25,118,210,0.12);
+}
+.layout{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:920px){ .layout{grid-template-columns:340px 1fr} }
+
+.card{background:var(--card);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow);border:1px solid rgba(15,45,90,0.03)}
+.header-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.small{font-size:13px;color:var(--muted)}
+.actions{display:flex;gap:8px;align-items:center}
+.btn{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;font-weight:700;cursor:pointer}
+.btn.ghost{background:transparent;border:1px solid rgba(25,118,210,0.12);color:var(--accent)}
+.btn.small{padding:6px 8px;font-weight:600}
+.input{width:100%;padding:8px;border-radius:8px;border:1px solid #eef7ff;background:transparent}
+.list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;border:1px solid #eef6ff;background:linear-gradient(180deg,#fff,#fbfeff);cursor:pointer}
+.item:hover{box-shadow:0 6px 18px rgba(17,24,39,0.04)}
+.item-meta{font-size:13px;color:var(--muted)}
+.progress-wrap{width:100%;background:#e9f6ff;border-radius:999px;height:14px;overflow:hidden;margin-top:8px}
+.progress-bar{height:100%;width:0%;background:var(--accent);transition:width 0.25s linear}
+.footer{font-size:13px;color:var(--muted);text-align:center;margin-top:12px}
+
+/* floating control bar — white card with blue action buttons */
+.control-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(9,20,40,0.12);padding:10px 12px;display:flex;gap:8px;align-items:center;z-index:200;min-width:360px}
+.action{background:var(--accent);color:#fff;padding:10px 14px;border-radius:8px;border:0;font-weight:700;cursor:pointer}
+.action.ghost{background:transparent;color:var(--accent);border:1px solid rgba(25,118,210,0.12)}
+
+/* modal overlay + content (only content has box-shadow) */
+.modal-backdrop{position:fixed;inset:0;background:rgba(6,10,20,0.45);display:none;align-items:center;justify-content:center;z-index:300}
+.modal-content{width:92%;max-width:540px;background:#fff;border-radius:12px;padding:16px;box-shadow:0 12px 40px rgba(10,20,40,0.3)}
+.modal-content h3{margin:0 0 10px 0;color:var(--accent)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label{display:block;font-size:13px;color:var(--muted);margin-top:8px}
+.small-muted{font-size:13px;color:var(--muted)}
+
+/* clickable pointer for interactive elements */
+button, .item, .tab { cursor: pointer; }
+
+/* right-side details area */
+.details { display:flex; flex-direction:column; gap:8px; }
+.details .row { display:flex; gap:8px; }
+.details .cardsmall { background:#fbfeff; border-radius:8px; padding:8px; border:1px solid #eef6ff; flex:1; }
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-title">Physio Counter</div>
+    <div class="small">Offline • PWA-ready</div>
+  </header>
+
+  <main class="container">
+    <div class="tabs" role="tablist" aria-label="Main tabs">
+      <button class="tab active" data-tab="exercises">Exercises</button>
+      <button class="tab" data-tab="history">History</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </div>
+
+    <div class="layout">
+      <!-- Left: compact list -->
+      <aside class="card" id="left-col">
+        <div class="header-row">
+          <div style="font-weight:700">Exercises</div>
+          <div class="actions">
+            <button id="addExerciseBtn" class="btn">+ Add</button>
+          </div>
+        </div>
+        <div class="small-muted" style="margin-top:8px">Tap an exercise to view details on the right. Left shows only name & last activity.</div>
+        <div id="exerciseList" class="list"></div>
+      </aside>
+
+      <!-- Right: details panel (always visible) -->
+      <section class="card" id="right-col">
+        <div id="panelContent">
+          <h3>Select an exercise</h3>
+          <p class="small-muted">Click an exercise on the left to view configuration, start runs, or edit settings.</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">Import / Export in Settings • Data stored locally in this browser</div>
+  </main>
+
+  <!-- Floating control bar -->
+  <div id="controlBar" class="control-bar" aria-hidden="true" style="display:none">
+    <button id="startResumeBtn" class="action">Start</button>
+    <button id="pauseBtn" class="action ghost">Pause</button>
+    <button id="nextSetBtn" class="action ghost">Next Set</button>
+    <button id="stopBtn" class="action ghost">Stop</button>
+  </div>
+
+  <!-- Modal overlay -->
+  <div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div id="modalContent" class="modal-content" role="document"></div>
+  </div>
+
+<script>
+/* ===============================
+   v4.6.1 - main script
+   (Only the tab-switching recursion bug was fixed. All other behaviour retained.)
+   =============================== */
+
+/* Persistence key */
+const KEY = 'physio_v4_6';
+let state = JSON.parse(localStorage.getItem(KEY) || '{"exercises":[],"history":[],"settings":{"voice":null,"rate":1,"setFeedback":"tts"}}');
+
+/* utility */
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+function uid(){ return 'id-' + Math.random().toString(36).slice(2,9); }
+function nowDay(){ return new Date().toISOString().split('T')[0]; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* TTS and beep */
+const synth = window.speechSynthesis;
+function tts(text, useVoiceName=null){
+  try{
+    const u = new SpeechSynthesisUtterance(String(text));
+    u.rate = state.settings?.rate || 1;
+    if(useVoiceName){
+      const v = synth.getVoices().find(v=>v.name === useVoiceName);
+      if(v) u.voice = v;
+    } else if(state.settings && state.settings.voice){
+      const v = synth.getVoices().find(v=>v.name === state.settings.voice);
+      if(v) u.voice = v;
+    }
+    synth.speak(u);
+  }catch(e){ console.warn('tts fail', e); }
+}
+function beep(freq=900, dur=0.06){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.type='sine'; o.frequency.value = freq;
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.2, ctx.currentTime+0.01);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+dur);
+    setTimeout(()=>{ try{ o.stop(); }catch(e){} }, (dur+0.02)*1000);
+  }catch(e){ console.warn('beep fail', e); }
+}
+function vibrate(ms){ if(navigator.vibrate) navigator.vibrate(ms); }
+
+/* DOM refs */
+const exerciseList = document.getElementById('exerciseList');
+const addExerciseBtn = document.getElementById('addExerciseBtn');
+const panelContent = document.getElementById('panelContent');
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalContent = document.getElementById('modalContent');
+
+const controlBar = document.getElementById('controlBar');
+const startResumeBtn = document.getElementById('startResumeBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const nextSetBtn = document.getElementById('nextSetBtn');
+const stopBtn = document.getElementById('stopBtn');
+
+/* run context - null when idle */
+let runCtx = null;
+
+/* ------------------------------
+   Normalize state shape
+   ------------------------------ */
+function normalizeState(){
+  state.exercises = (state.exercises || []).map(ex => {
+    if(!ex.id) ex.id = uid();
+    if(!ex.history) ex.history = {};
+    if(!('lastPosition' in ex)) ex.lastPosition = null;
+    return ex;
+  });
+  state.history = state.history || [];
+  state.settings = state.settings || {voice:null, rate:1, setFeedback:'tts'};
+  save();
+}
+normalizeState();
+
+/* ------------------------------
+   Render exercise list (lean)
+   ------------------------------ */
+function renderExerciseList(){
+  exerciseList.innerHTML = '';
+  state.exercises.forEach(ex => {
+    const d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = `<div>
+      <div style="font-weight:700">${escapeHtml(ex.name)}</div>
+      <div class="item-meta">${lastHistorySummary(ex)}</div>
+    </div>`;
+    d.onclick = ()=> selectExercise(ex.id);
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const startBtn = document.createElement('button');
+    startBtn.className = 'btn small'; startBtn.textContent = 'Start';
+    startBtn.onclick = (ev)=>{ ev.stopPropagation(); openStartConfirm(ex.id); };
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn ghost small'; editBtn.textContent = 'Edit';
+    editBtn.onclick = (ev)=>{ ev.stopPropagation(); openEditModal(ex.id); };
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn ghost small'; delBtn.textContent = 'Delete';
+    delBtn.onclick = (ev)=>{ ev.stopPropagation(); if(confirm('Delete?')){ state.exercises = state.exercises.filter(x=>x.id!==ex.id); save(); renderExerciseList(); clearSelectionIfDeleted(ex.id); } };
+    actions.append(startBtn, editBtn, delBtn);
+    d.appendChild(actions);
+    exerciseList.appendChild(d);
+  });
+  addExerciseBtn.style.display = runCtx ? 'none' : '';
+}
+
+function lastHistorySummary(ex){
+  if(ex.lastPosition) return `Last pos: set ${ex.lastPosition.setIdx}, rep ${ex.lastPosition.repIdx}`;
+  const top = state.history.filter(h=>h.name === ex.name).sort((a,b)=> b.date.localeCompare(a.date))[0];
+  if(top) return `Last: ${top.date} • ${top.sets} sets`;
+  return 'No recent activity';
+}
+
+/* selection & details */
+let selectedExId = null;
+function selectExercise(id){
+  selectedExId = id;
+  renderSelectedDetails();
+}
+function clearSelectionIfDeleted(id){
+  if(selectedExId === id){ selectedExId = null; panelContent.innerHTML = `<h3>Select an exercise</h3><p class="small-muted">Click an exercise on the left to view its configuration.</p>`; }
+}
+function renderSelectedDetails(){
+  const ex = state.exercises.find(x=>x.id === selectedExId);
+  if(!ex){
+    panelContent.innerHTML = `<h3>Select an exercise</h3><p class="small-muted">Click an exercise on the left to view its configuration and start runs.</p>`;
+    return;
+  }
+  panelContent.innerHTML = `
+    <h3>${escapeHtml(ex.name)}</h3>
+    <div class="small-muted">Configuration</div>
+    <div class="details">
+      <div class="row">
+        <div class="cardsmall"><div class="small-muted">Sets</div><div style="font-weight:700">${ex.sets}</div></div>
+        <div class="cardsmall"><div class="small-muted">Reps</div><div style="font-weight:700">${ex.reps}</div></div>
+      </div>
+      <div class="row">
+        <div class="cardsmall"><div class="small-muted">Interval (s)</div><div style="font-weight:700">${ex.interval}</div></div>
+        <div class="cardsmall"><div class="small-muted">Warm-up (s)</div><div style="font-weight:700">${ex.warmup}</div></div>
+      </div>
+      <div class="row">
+        <div class="cardsmall"><div class="small-muted">Mode</div><div style="font-weight:700">${ex.mode}</div></div>
+        <div class="cardsmall"><div class="small-muted">Last pos</div><div style="font-weight:700">${ex.lastPosition ? 'set '+ex.lastPosition.setIdx + ' rep '+ex.lastPosition.repIdx : 'none'}</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn" id="detailStartBtn">Start</button>
+        <button class="btn ghost" id="detailEditBtn">Edit</button>
+        <button class="btn ghost" id="detailDeleteBtn">Delete</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('detailStartBtn').onclick = ()=> openStartConfirm(ex.id);
+  document.getElementById('detailEditBtn').onclick = ()=> openEditModal(ex.id);
+  document.getElementById('detailDeleteBtn').onclick = ()=> { if(confirm('Delete?')){ state.exercises = state.exercises.filter(x=>x.id!==ex.id); save(); renderExerciseList(); selectedExId = null; renderSelectedDetails(); }};
+}
+
+/* ------------------------------
+   Modal helper
+   ------------------------------ */
+function openModal(title, innerHtml, onSave, onCancel){
+  modalContent.innerHTML = `<h3>${escapeHtml(title)}</h3>${innerHtml}
+    <div style="text-align:right;margin-top:12px">
+      <button id="modalCancel" class="btn ghost small">Cancel</button>
+      <button id="modalSave" class="btn small">Save</button>
+    </div>`;
+  modalBackdrop.style.display = 'flex';
+  modalBackdrop.setAttribute('aria-hidden','false');
+  const saveBtn = document.getElementById('modalSave');
+  const cancelBtn = document.getElementById('modalCancel');
+  cancelBtn.onclick = ()=> { modalBackdrop.style.display='none'; modalBackdrop.setAttribute('aria-hidden','true'); if(onCancel) onCancel(); };
+  saveBtn.onclick = ()=> { try{ onSave(); } catch(e){ console.error(e); } modalBackdrop.style.display='none'; modalBackdrop.setAttribute('aria-hidden','true'); };
+  modalBackdrop.onclick = (e) => { if(e.target === modalBackdrop){ modalBackdrop.style.display='none'; modalBackdrop.setAttribute('aria-hidden','true'); if(onCancel) onCancel(); } };
+}
+
+/* ------------------------------
+   Add / Edit exercise
+   ------------------------------ */
+addExerciseBtn.onclick = openAddModal;
+
+function openAddModal(){
+  const defaults = { name:'New Exercise', sets:25, reps:10, interval:0.75, warmup:5, mode:'both' };
+  openEditForm('Add Exercise', defaults, (form)=> {
+    const ex = { id: uid(), ...form, history: {}, lastPosition: null };
+    state.exercises.push(ex); save(); renderExerciseList(); selectedExId = ex.id; renderSelectedDetails();
+  });
+}
+function openEditModal(exId){
+  const ex = state.exercises.find(x=>x.id===exId);
+  if(!ex) return;
+  openEditForm('Edit Exercise', ex, (form)=> {
+    Object.assign(ex, form);
+    save(); renderExerciseList(); renderSelectedDetails();
+  });
+}
+
+function openEditForm(title, exData, onSave){
+  const html = `
+    <div class="form-grid">
+      <label>Name <input id="m_name" class="input" value="${escapeHtml(exData.name)}"></label>
+      <label>Sets <input id="m_sets" type="number" class="input" value="${exData.sets}"></label>
+      <label>Reps <input id="m_reps" type="number" class="input" value="${exData.reps}"></label>
+      <label>Warm-up (s) <input id="m_warmup" type="number" class="input" value="${exData.warmup}"></label>
+    </div>
+    <label style="margin-top:8px">Interval
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="m_interval" type="range" min="0.5" max="5" step="0.25" value="${exData.interval}" style="flex:1">
+        <div id="m_interval_val" style="min-width:56px;text-align:center;background:#eef8ff;border-radius:6px;padding:6px">${exData.interval}s</div>
+      </div>
+    </label>
+    <label>Mode
+      <select id="m_mode" class="input">
+        <option value="tts" ${exData.mode==='tts'?'selected':''}>TTS</option>
+        <option value="beep" ${exData.mode==='beep'?'selected':''}>Beep</option>
+        <option value="both" ${exData.mode==='both'?'selected':''}>Both</option>
+      </select>
+    </label>
+  `;
+  openModal(title, html, ()=> {
+    const form = {
+      name: document.getElementById('m_name').value || exData.name,
+      sets: Math.max(1, parseInt(document.getElementById('m_sets').value) || exData.sets),
+      reps: Math.max(1, parseInt(document.getElementById('m_reps').value) || exData.reps),
+      interval: parseFloat(document.getElementById('m_interval').value) || exData.interval,
+      warmup: Math.max(0, parseInt(document.getElementById('m_warmup').value) || exData.warmup),
+      mode: document.getElementById('m_mode').value || exData.mode
+    };
+    onSave(form);
+  }, null);
+  setTimeout(()=> {
+    const s = document.getElementById('m_interval');
+    const v = document.getElementById('m_interval_val');
+    if(s && v) s.oninput = ()=> v.textContent = s.value + 's';
+  }, 10);
+}
+
+/* ------------------------------
+   Start confirm & resume option
+   ------------------------------ */
+function openStartConfirm(exId){
+  const ex = state.exercises.find(x=>x.id===exId);
+  if(!ex) return;
+  const hasLast = ex.lastPosition && (ex.lastPosition.setIdx <= ex.sets);
+  const suggested = hasLast ? ex.lastPosition.setIdx : 1;
+  const html = `
+    <div class="small-muted">Confirm total sets for tracking</div>
+    <label>Sets <input id="s_sets" class="input" type="number" value="${ex.sets}"></label>
+    <label>Start at set # <input id="s_start" class="input" type="number" min="1" max="${ex.sets}" value="${suggested}"></label>
+    ${hasLast ? `<div style="margin-top:8px" class="small-muted">Previous run stopped at set ${ex.lastPosition.setIdx}, rep ${ex.lastPosition.repIdx}.</div>
+      <label><input id="s_resume" type="checkbox" checked> Resume from last saved position</label>` : ''}
+  `;
+  openModal('Start exercise', html, ()=> {
+    const newSets = Math.max(1, parseInt(document.getElementById('s_sets').value) || ex.sets);
+    let startAt = Math.max(1, parseInt(document.getElementById('s_start').value) || 1);
+    ex.sets = newSets;
+    let resume = false;
+    if(hasLast) resume = !!document.getElementById('s_resume') && document.getElementById('s_resume').checked;
+    if(resume){
+      runCtx = { exId: ex.id, ex, setIdx: ex.lastPosition.setIdx, repIdx: ex.lastPosition.repIdx || 0, state:'idle', timerId:null, paused:false, remainingMs:null };
+    } else {
+      runCtx = { exId: ex.id, ex, setIdx: startAt, repIdx:0, state:'idle', timerId:null, paused:false, remainingMs:null };
+    }
+    save();
+    addExerciseBtn.style.display = 'none';
+    showRunPanel();
+    startWarmupBeforeSet();
+  });
+}
+
+/* ------------------------------
+   Run UI + logic (warmup per set, pause/resume mid-set)
+   ------------------------------ */
+function showRunPanel(){
+  if(!runCtx) return;
+  const ex = runCtx.ex;
+  panelContent.innerHTML = `
+    <h3>${escapeHtml(ex.name)}</h3>
+    <div class="small-muted">Set <span id="ui_set">${runCtx.setIdx}</span> / ${ex.sets}</div>
+    <div style="margin-top:12px" class="card">
+      <div id="ui_count" style="font-size:48px;text-align:center">—</div>
+      <div class="progress-wrap"><div id="ui_progress" class="progress-bar" style="width:0%"></div></div>
+      <div style="margin-top:8px;text-align:center" id="ui_status" class="small-muted">Idle</div>
+    </div>
+  `;
+  controlBar.style.display = 'flex';
+  updateControlState();
+}
+
+function startWarmupBeforeSet(){
+  if(!runCtx) return;
+  const ex = runCtx.ex;
+  runCtx.state = 'warmup';
+  runCtx.repIdx = runCtx.repIdx || 0;
+  let t = ex.warmup;
+  const uiCount = document.getElementById('ui_count');
+  const uiStatus = document.getElementById('ui_status');
+  uiStatus.textContent = `Warm-up ${t}s`;
+  tts('Get ready');
+  vibrate(60);
+  if(runCtx.timerId){ clearTimeout(runCtx.timerId); runCtx.timerId = null; }
+  function tick(){
+    if(!runCtx) return;
+    if(runCtx.paused){ runCtx.timerId = setTimeout(tick, 300); return; }
+    t--;
+    if(t > 0){
+      uiCount.textContent = String(t);
+      tts(String(t));
+      runCtx.timerId = setTimeout(tick, 1000);
+    } else {
+      uiCount.textContent = 'Go';
+      tts('Go');
+      vibrate(120);
+      runCtx.timerId = null;
+      startCounting();
+    }
+    updateControlState();
+  }
+  uiCount.textContent = String(t);
+  runCtx.timerId = setTimeout(tick, 1000);
+  updateControlState();
+}
+
+function startCounting(){
+  if(!runCtx) return;
+  const ex = runCtx.ex;
+  runCtx.state = 'running';
+  runCtx.repIdx = runCtx.repIdx || 0;
+  const uiCount = document.getElementById('ui_count');
+  const uiProgress = document.getElementById('ui_progress');
+
+  function scheduleNext(delayMs){
+    if(runCtx.timerId){ clearTimeout(runCtx.timerId); runCtx.timerId = null; }
+    runCtx.nextTickAt = performance.now() + delayMs;
+    runCtx.timerId = setTimeout(repTick, delayMs);
+  }
+
+  function repTick(){
+    if(!runCtx) return;
+    if(runCtx.paused){
+      const remaining = Math.max(0, runCtx.nextTickAt - performance.now());
+      runCtx.remainingMs = remaining;
+      clearTimeout(runCtx.timerId); runCtx.timerId = null;
+      return;
+    }
+    runCtx.repIdx++;
+    uiCount.textContent = String(runCtx.repIdx);
+    const pct = Math.min(100, (runCtx.repIdx / ex.reps) * 100);
+    uiProgress.style.width = pct + '%';
+    if(ex.mode === 'tts') tts(String(runCtx.repIdx));
+    else if(ex.mode === 'beep') beep();
+    else { tts(String(runCtx.repIdx)); setTimeout(()=>beep(), 120); }
+    if(runCtx.repIdx >= ex.reps){
+      const day = nowDay();
+      if(!ex.history) ex.history = {};
+      if(!ex.history[day]) ex.history[day] = Array(ex.sets).fill(false);
+      ex.history[day][Math.max(0, runCtx.setIdx - 1)] = true;
+      addTopLevelHistory(ex.name, 1);
+      save();
+      runCtx.repIdx = 0;
+      runCtx.state = 'idle';
+      document.getElementById('ui_status').textContent = 'Set complete — press Next Set to continue';
+      
+      // Set completion feedback based on global setting
+      const feedback = state.settings?.setFeedback || 'tts';
+      if(feedback === 'tts') {
+        tts('set complete');
+      } else if(feedback === 'beep') {
+        beep(1200, 0.15); // Higher pitch, longer duration than countdown beep
+      }
+      // 'none' option does nothing
+      
+      vibrate(220);
+      ex.lastPosition = { setIdx: runCtx.setIdx, repIdx: 0 };
+      save();
+      updateControlState();
+      return;
+    }
+    scheduleNext(ex.interval * 1000);
+    updateControlState();
+  }
+
+  if(runCtx.remainingMs && runCtx.remainingMs > 10){
+    const rem = runCtx.remainingMs;
+    runCtx.remainingMs = null;
+    scheduleNext(rem);
+  } else {
+    scheduleNext(ex.interval * 1000);
+  }
+}
+
+/* pause/resume handlers */
+startResumeBtn.onclick = ()=>{
+  if(!runCtx) return;
+  if(runCtx.state === 'idle'){
+    startWarmupBeforeSet();
+  } else if(runCtx.state === 'warmup' || runCtx.state === 'running'){
+    if(runCtx.paused){
+      runCtx.paused = false;
+      if(runCtx.state === 'warmup') startWarmupBeforeSet();
+      else startCounting();
+    }
+  } else if(runCtx.state === 'paused'){
+    runCtx.paused = false;
+    if(runCtx.repIdx > 0) startCounting(); else startWarmupBeforeSet();
+  }
+  updateControlState();
+};
+
+pauseBtn.onclick = ()=>{
+  if(!runCtx) return;
+  runCtx.paused = true;
+  runCtx.state = 'paused';
+  document.getElementById('ui_status') && (document.getElementById('ui_status').textContent = 'Paused');
+  updateControlState();
+};
+
+nextSetBtn.onclick = ()=>{
+  if(!runCtx) return;
+  if(runCtx.setIdx > runCtx.ex.sets){ tts('Exercise complete'); vibrate(300); finishRun(); return; }
+  runCtx.setIdx = Math.min(runCtx.ex.sets, runCtx.setIdx + 1);
+  document.getElementById('ui_set').textContent = runCtx.setIdx;
+  startWarmupBeforeSet();
+};
+
+stopBtn.onclick = ()=>{
+  if(!runCtx) return;
+  const ex = runCtx.ex;
+  ex.lastPosition = { setIdx: runCtx.setIdx, repIdx: runCtx.repIdx || 0 };
+  save();
+  if(runCtx.timerId){ clearTimeout(runCtx.timerId); runCtx.timerId = null; }
+  runCtx = null;
+  controlBar.style.display = 'none';
+  addExerciseBtn.style.display = '';
+  renderExerciseList();
+  panelContent.innerHTML = `<h3>Stopped</h3><p class="small-muted">Run stopped. Last position saved.</p>`;
+};
+
+function finishRun(){
+  if(!runCtx) return;
+  const ex = runCtx.ex;
+  ex.lastPosition = null;
+  save();
+  runCtx = null;
+  controlBar.style.display = 'none';
+  addExerciseBtn.style.display = '';
+  renderExerciseList();
+  panelContent.innerHTML = `<h3>All sets complete</h3><p class="small-muted">Great job — history recorded.</p>`;
+}
+
+function updateControlState(){
+  if(!runCtx){ controlBar.style.display = 'none'; addExerciseBtn.style.display = ''; return; }
+  controlBar.style.display = 'flex';
+  pauseBtn.disabled = !(runCtx.state === 'warmup' || runCtx.state === 'running');
+  startResumeBtn.disabled = false;
+  nextSetBtn.disabled = (runCtx.state === 'running');
+  stopBtn.disabled = false;
+}
+
+/* ------------------------------
+   History helpers
+   ------------------------------ */
+function addTopLevelHistory(name, sets){
+  const d = nowDay();
+  let entry = state.history.find(h => h.date === d && h.name === name);
+  if(!entry){
+    entry = { id: uid(), date: d, name, sets: 0 };
+    state.history.push(entry);
+  }
+  entry.sets += sets;
+  save();
+}
+
+/* ------------------------------
+   History & Settings rendering
+   ------------------------------ */
+function renderHistoryPanel(){
+  panelContent.innerHTML = `<h3>History</h3><div id="historyPanel"></div>`;
+  const panel = document.getElementById('historyPanel');
+  panel.innerHTML = '';
+  const sorted = (state.history || []).slice().sort((a,b)=> b.date.localeCompare(a.date));
+  sorted.forEach(h => {
+    const box = document.createElement('div'); box.className='card'; box.style.marginBottom='8px';
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>${h.date}</strong><div class="small-muted">${h.name}</div></div><div style="font-weight:700">${h.sets} sets</div></div>
+      <div style="margin-top:8px"><button class="btn ghost small" onclick="editTopLevelHistory('${h.id}')">Edit</button></div>`;
+    panel.appendChild(box);
+  });
+  const per = document.createElement('div'); per.style.marginTop='12px';
+  per.innerHTML = `<h4>Per-exercise daily detail</h4>`;
+  state.exercises.forEach(ex => {
+    const box = document.createElement('div'); box.className='card'; box.style.marginBottom='8px';
+    let html = `<div style="font-weight:700">${escapeHtml(ex.name)}</div>`;
+    const days = Object.keys(ex.history || {}).sort((a,b)=> b.localeCompare(a));
+    days.forEach(d => {
+      const arr = ex.history[d] || [];
+      const done = arr.filter(Boolean).length;
+      html += `<div style="display:flex;justify-content:space-between;padding:6px 0"><div>${d}</div><div class="small-muted">${done} / ${ex.sets} sets</div></div>`;
+    });
+    box.innerHTML = html;
+    per.appendChild(box);
+  });
+  panel.appendChild(per);
+}
+function editTopLevelHistory(id){
+  const entry = state.history.find(h => h.id === id);
+  if(!entry) return;
+  const ns = prompt('Update sets', entry.sets);
+  if(ns !== null){
+    const n = parseInt(ns, 10);
+    if(!isNaN(n)){ entry.sets = n; save(); renderHistoryPanel(); }
+  }
+}
+
+function renderSettingsPanel(){
+  panelContent.innerHTML = `
+    <h3>Settings</h3>
+    <div class="small-muted">Global voice settings (used for TTS)</div>
+    <div id="settingsInner" style="margin-top:8px"></div>
+    <div class="small-muted" style="margin-top:16px">Set completion feedback</div>
+    <div id="setFeedbackInner" style="margin-top:8px"></div>
+  `;
+  const settingsInner = document.getElementById('settingsInner');
+  const sel = document.createElement('select'); sel.className = 'input'; sel.id = 'voiceSel';
+  const voices = synth.getVoices();
+  sel.innerHTML = '<option value="">(default)</option>';
+  voices.forEach(v => {
+    const opt = document.createElement('option'); opt.value = v.name; opt.text = `${v.name} (${v.lang})`;
+    if(state.settings && state.settings.voice === v.name) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  settingsInner.appendChild(sel);
+  const rate = document.createElement('input'); rate.type='range'; rate.min=0.5; rate.max=2; rate.step=0.05; rate.value = state.settings?.rate || 1; rate.style.marginTop='8px';
+  settingsInner.appendChild(rate);
+  
+  // Set feedback settings
+  const setFeedbackInner = document.getElementById('setFeedbackInner');
+  const setFeedbackSel = document.createElement('select'); setFeedbackSel.className = 'input'; setFeedbackSel.id = 'setFeedbackSel';
+  setFeedbackSel.innerHTML = `
+    <option value="tts" ${state.settings?.setFeedback === 'tts' ? 'selected' : ''}>TTS - Say "set complete"</option>
+    <option value="beep" ${state.settings?.setFeedback === 'beep' ? 'selected' : ''}>Beep - Strong beep sound</option>
+    <option value="none" ${state.settings?.setFeedback === 'none' ? 'selected' : ''}>None - No audio feedback</option>
+  `;
+  setFeedbackInner.appendChild(setFeedbackSel);
+  
+  // Save button for all settings
+  const saveBtn = document.createElement('button'); saveBtn.className='btn ghost small'; saveBtn.textContent='Save All Settings'; saveBtn.style.marginTop='12px';
+  setFeedbackInner.appendChild(saveBtn);
+  
+  const testBtn = document.createElement('button'); testBtn.className='btn small'; testBtn.textContent='Test Voice'; testBtn.style.marginLeft='8px';
+  settingsInner.appendChild(testBtn);
+  
+  const hr = document.createElement('hr'); hr.style.marginTop='12px'; settingsInner.appendChild(hr);
+  const exp = document.createElement('button'); exp.className='btn small'; exp.textContent='Export JSON';
+  const imp = document.createElement('button'); imp.className='btn ghost small'; imp.textContent='Import JSON'; imp.style.marginLeft='8px';
+  const reset = document.createElement('button'); reset.className='btn ghost small'; reset.textContent='Reset All'; reset.style.marginLeft='8px';
+  settingsInner.appendChild(exp); settingsInner.appendChild(imp); settingsInner.appendChild(reset);
+  const taLabel = document.createElement('label'); taLabel.className='small-muted'; taLabel.style.display='block'; taLabel.style.marginTop='8px'; taLabel.textContent = 'Paste JSON to import (overwrites current data)';
+  const ta = document.createElement('textarea'); ta.id='importArea'; ta.style.width='100%'; ta.style.height='120px'; ta.style.marginTop='8px'; ta.style.padding='8px';
+  settingsInner.appendChild(taLabel); settingsInner.appendChild(ta);
+
+  // immediate test uses selected dropdown voice without saving
+  testBtn.onclick = ()=> {
+    const selVal = sel.value;
+    const rateVal = parseFloat(rate.value) || 1;
+    const u = new SpeechSynthesisUtterance('This is a test of the selected voice.');
+    u.rate = rateVal;
+    const voicesNow = synth.getVoices();
+    if(selVal){
+      const v = voicesNow.find(x=>x.name === selVal);
+      if(v) u.voice = v;
+    } else if(state.settings && state.settings.voice){
+      const v = voicesNow.find(x=>x.name === state.settings.voice);
+      if(v) u.voice = v;
+    }
+    synth.speak(u);
+  };
+  saveBtn.onclick = ()=> {
+    state.settings.rate = parseFloat(rate.value) || 1;
+    state.settings.voice = sel.value || null;
+    state.settings.setFeedback = setFeedbackSel.value || 'tts';
+    save();
+    alert('Saved');
+  };
+  exp.onclick = ()=> {
+    const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='physio-export-v4.6.1.json'; a.click();
+  };
+  imp.onclick = ()=> {
+    const input = document.createElement('input'); input.type='file'; input.onchange = e=>{
+      const f = e.target.files[0]; const r = new FileReader();
+      r.onload = ()=> {
+        try{
+          const p = JSON.parse(r.result);
+          if(!Array.isArray(p.exercises)) throw new Error('Invalid format');
+          state = p; state.settings = state.settings || {voice:null,rate:1}; normalizeState(); renderExerciseList(); showExercisesTab(); alert('Imported');
+        }catch(err){ alert('Import failed: ' + err.message); }
+      }; r.readAsText(f);
+    }; input.click();
+  };
+  reset.onclick = ()=> { if(confirm('Reset all data?')){ state = {exercises:[],history:[],settings:{voice:null,rate:1}}; save(); renderExerciseList(); showExercisesTab(); } };
+}
+
+/* ------------------------------
+   Safe tab switching (fixed recursion)
+   - single handler handleTab(tab) used by clicks
+   - does not indirectly call other tab click handlers
+   ------------------------------ */
+function handleTab(tab){
+  // set visual active states
+  document.querySelectorAll('.tab').forEach(t => {
+    if(t.dataset.tab === tab) t.classList.add('active'); else t.classList.remove('active');
+  });
+  // call the specific panel renderer *without* triggering click handlers
+  if(tab === 'exercises'){
+    renderExerciseList();
+    panelContent.innerHTML = `<h3>Select an exercise</h3><p class="small-muted">Click an exercise on the left to view its configuration.</p>`;
+  } else if(tab === 'history'){
+    renderHistoryPanel();
+  } else if(tab === 'settings'){
+    // ensure voices are loaded then render settings
+    if(speechSynthesis.getVoices().length === 0){
+      speechSynthesis.onvoiceschanged = () => { renderSettingsPanel(); };
+    } else {
+      renderSettingsPanel();
+    }
+  }
+}
+
+/* wire tab buttons to the safe handler */
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=> {
+    const tab = btn.dataset.tab;
+    handleTab(tab);
+  });
+});
+
+/* ------------------------------
+   Initialization
+   ------------------------------ */
+renderExerciseList();
+// populate voices in the background
+if(speechSynthesis.getVoices().length === 0){
+  speechSynthesis.onvoiceschanged = ()=> {};
+}
+
+/* ------------------------------
+   Service Worker Registration (PWA)
+   ------------------------------ */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=> {
+    navigator.serviceWorker.register('./sw.js')
+      .then(registration => {
+        console.log('ServiceWorker registered:', registration.scope);
+      })
+      .catch(err => {
+        console.log('ServiceWorker registration failed:', err);
+      });
+  });
+}
+</script>
+</body>
+</html>
