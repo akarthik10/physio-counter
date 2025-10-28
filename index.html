@@ -403,27 +403,45 @@ function openStartConfirm(exId){
   const suggested = hasLast ? ex.lastPosition.setIdx : 1;
   const html = `
     <div class="small-muted">Confirm total sets for tracking</div>
+    <label>Date <input id="s_date" class="input" type="date" value="${nowDay()}"></label>
     <label>Sets <input id="s_sets" class="input" type="number" value="${ex.sets}"></label>
     <label>Start at set # <input id="s_start" class="input" type="number" min="1" max="${ex.sets}" value="${suggested}"></label>
     ${hasLast ? `<div style="margin-top:8px" class="small-muted">Previous run stopped at set ${ex.lastPosition.setIdx}, rep ${ex.lastPosition.repIdx}.</div>
       <label><input id="s_resume" type="checkbox" checked> Resume from last saved position</label>` : ''}
   `;
   openModal('Start exercise', html, ()=> {
+    const selectedDate = document.getElementById('s_date').value || nowDay();
     const newSets = Math.max(1, parseInt(document.getElementById('s_sets').value) || ex.sets);
     let startAt = Math.max(1, parseInt(document.getElementById('s_start').value) || 1);
     ex.sets = newSets;
     let resume = false;
     if(hasLast) resume = !!document.getElementById('s_resume') && document.getElementById('s_resume').checked;
     if(resume){
-      runCtx = { exId: ex.id, ex, setIdx: ex.lastPosition.setIdx, repIdx: ex.lastPosition.repIdx || 0, state:'idle', timerId:null, paused:false, remainingMs:null };
+      runCtx = { exId: ex.id, ex, setIdx: ex.lastPosition.setIdx, repIdx: ex.lastPosition.repIdx || 0, state:'idle', timerId:null, paused:false, remainingMs:null, selectedDate };
     } else {
-      runCtx = { exId: ex.id, ex, setIdx: startAt, repIdx:0, state:'idle', timerId:null, paused:false, remainingMs:null };
+      runCtx = { exId: ex.id, ex, setIdx: startAt, repIdx:0, state:'idle', timerId:null, paused:false, remainingMs:null, selectedDate };
     }
     save();
     addExerciseBtn.style.display = 'none';
     showRunPanel();
     startWarmupBeforeSet();
   });
+  
+  // Add event listener to update start position when date changes
+  setTimeout(() => {
+    const dateInput = document.getElementById('s_date');
+    const startInput = document.getElementById('s_start');
+    if (dateInput && startInput) {
+      dateInput.addEventListener('change', () => {
+        const selectedDate = dateInput.value || nowDay();
+        const dayHistory = ex.history && ex.history[selectedDate] ? ex.history[selectedDate] : [];
+        const completedSets = dayHistory.filter(Boolean).length;
+        const suggestedStart = Math.min(ex.sets, completedSets + 1);
+        startInput.value = suggestedStart;
+        startInput.max = ex.sets;
+      });
+    }
+  }, 10);
 }
 
 /* ------------------------------
@@ -530,11 +548,11 @@ function startCounting(){
     else if(ex.mode === 'beep') beep();
     else { tts(String(runCtx.repIdx)); setTimeout(()=>beep(), 120); }
     if(runCtx.repIdx >= ex.reps){
-      const day = nowDay();
+      const day = runCtx.selectedDate;
       if(!ex.history) ex.history = {};
       if(!ex.history[day]) ex.history[day] = Array(ex.sets).fill(false);
       ex.history[day][Math.max(0, runCtx.setIdx - 1)] = true;
-      addTopLevelHistory(ex.name, 1);
+      addTopLevelHistory(ex.name, 1, runCtx.selectedDate);
       save();
       runCtx.repIdx = 0;
       runCtx.state = 'idle';
@@ -639,8 +657,8 @@ function updateControlState(){
 /* ------------------------------
    History helpers
    ------------------------------ */
-function addTopLevelHistory(name, sets){
-  const d = nowDay();
+function addTopLevelHistory(name, sets, date){
+  const d = date || nowDay();
   let entry = state.history.find(h => h.date === d && h.name === name);
   if(!entry){
     entry = { id: uid(), date: d, name, sets: 0 };
@@ -660,8 +678,29 @@ function renderHistoryPanel(){
   const sorted = (state.history || []).slice().sort((a,b)=> b.date.localeCompare(a.date));
   sorted.forEach(h => {
     const box = document.createElement('div'); box.className='card'; box.style.marginBottom='8px';
-    box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>${h.date}</strong><div class="small-muted">${h.name}</div></div><div style="font-weight:700">${h.sets} sets</div></div>
-      <div style="margin-top:8px"><button class="btn ghost small" onclick="editTopLevelHistory('${h.id}')">Edit</button></div>`;
+    
+    // Find the exercise to get planned sets
+    const exercise = state.exercises.find(ex => ex.name === h.name);
+    const plannedSets = exercise ? exercise.sets : '?';
+    const completedSets = h.sets;
+    const isComplete = exercise && completedSets >= plannedSets;
+    
+    // Create completion indicator and status text
+    const completionIcon = isComplete ? '✓' : '✗';
+    const statusText = isComplete ? 'Complete' : 'In progress';
+    const statusColor = isComplete ? 'color: #28a745;' : '';
+    
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <strong>${h.date}</strong>
+        <div class="small-muted">${h.name}</div>
+      </div>
+      <div style="font-weight:700; ${statusColor}">
+        ${completionIcon} ${completedSets} / ${plannedSets} sets
+        <div class="small-muted" style="${statusColor}">${statusText}</div>
+      </div>
+    </div>
+    <div style="margin-top:8px"><button class="btn ghost small" onclick="editTopLevelHistory('${h.id}')">Edit</button></div>`;
     panel.appendChild(box);
   });
   const per = document.createElement('div'); per.style.marginTop='12px';
